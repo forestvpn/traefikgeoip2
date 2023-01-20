@@ -21,20 +21,23 @@ func ResetLookup() {
 
 // Config the plugin configuration.
 type Config struct {
-	DBPath string `json:"dbPath,omitempty"`
+	DBPath   string `json:"dbPath,omitempty"`
+	IPHeader string `json:"ipHeader,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		DBPath: DefaultDBPath,
+		DBPath:   DefaultDBPath,
+		IPHeader: DefaultIPHeader,
 	}
 }
 
 // TraefikGeoIP2 a traefik geoip2 plugin.
 type TraefikGeoIP2 struct {
-	next http.Handler
-	name string
+	next     http.Handler
+	name     string
+	ipHeader string
 }
 
 // New created a new TraefikGeoIP2 plugin.
@@ -42,8 +45,9 @@ func New(_ context.Context, next http.Handler, cfg *Config, name string) (http.H
 	if _, err := os.Stat(cfg.DBPath); err != nil {
 		log.Printf("[geoip2] DB not found: db=%s, name=%s, err=%v", cfg.DBPath, name, err)
 		return &TraefikGeoIP2{
-			next: next,
-			name: name,
+			next:     next,
+			name:     name,
+			ipHeader: cfg.IPHeader,
 		}, nil
 	}
 
@@ -68,9 +72,24 @@ func New(_ context.Context, next http.Handler, cfg *Config, name string) (http.H
 	}
 
 	return &TraefikGeoIP2{
-		next: next,
-		name: name,
+		next:     next,
+		name:     name,
+		ipHeader: cfg.IPHeader,
 	}, nil
+}
+
+func (mw *TraefikGeoIP2) getIPStr(req *http.Request) string {
+	ipStr := req.RemoteAddr
+
+	if mw.ipHeader != "" {
+		if ipHeader := req.Header.Get(mw.ipHeader); ipHeader != "" {
+			ipStr = ipHeader
+		} else {
+			log.Printf("[geoip2] header \"%s\" is empty, fallback to RemoteAddr: \"%s\"", mw.ipHeader, ipStr)
+		}
+	}
+
+	return ipStr
 }
 
 func (mw *TraefikGeoIP2) ServeHTTP(reqWr http.ResponseWriter, req *http.Request) {
@@ -78,11 +97,13 @@ func (mw *TraefikGeoIP2) ServeHTTP(reqWr http.ResponseWriter, req *http.Request)
 		req.Header.Set(CountryHeader, Unknown)
 		req.Header.Set(RegionHeader, Unknown)
 		req.Header.Set(CityHeader, Unknown)
+		req.Header.Set(LatitudeHeader, Unknown)
+		req.Header.Set(LongitudeHeader, Unknown)
 		mw.next.ServeHTTP(reqWr, req)
 		return
 	}
 
-	ipStr := req.RemoteAddr
+	ipStr := mw.getIPStr(req)
 	tmp, _, err := net.SplitHostPort(ipStr)
 	if err == nil {
 		ipStr = tmp
@@ -92,15 +113,19 @@ func (mw *TraefikGeoIP2) ServeHTTP(reqWr http.ResponseWriter, req *http.Request)
 	if err != nil {
 		log.Printf("[geoip2] Unable to find: ip=%s, err=%v", ipStr, err)
 		res = &GeoIPResult{
-			country: Unknown,
-			region:  Unknown,
-			city:    Unknown,
+			country:   Unknown,
+			region:    Unknown,
+			city:      Unknown,
+			latitude:  Unknown,
+			longitude: Unknown,
 		}
 	}
 
 	req.Header.Set(CountryHeader, res.country)
 	req.Header.Set(RegionHeader, res.region)
 	req.Header.Set(CityHeader, res.city)
+	req.Header.Set(LatitudeHeader, res.latitude)
+	req.Header.Set(LongitudeHeader, res.longitude)
 
 	mw.next.ServeHTTP(reqWr, req)
 }

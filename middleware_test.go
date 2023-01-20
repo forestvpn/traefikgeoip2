@@ -7,12 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mw "github.com/GiGInnovationLabs/traefikgeoip2"
+	mw "github.com/forestvpn/traefikgeoip2"
 )
 
 const (
-	ValidIP       = "188.193.88.199"
-	ValidIPNoCity = "20.1.184.61"
+	ValidIP           = "188.193.88.199"
+	ValidIPFromHeader = "188.193.88.245"
+	ValidIPNoCity     = "20.1.184.61"
 )
 
 func TestGeoIPConfig(t *testing.T) {
@@ -116,6 +117,35 @@ func TestGeoIPFromRemoteAddr(t *testing.T) {
 	assertHeader(t, req, mw.CountryHeader, mw.Unknown)
 	assertHeader(t, req, mw.RegionHeader, mw.Unknown)
 	assertHeader(t, req, mw.CityHeader, mw.Unknown)
+}
+
+func TestGeoIPFromIPHeader(t *testing.T) {
+	ipHeader := "X-Forwarded-For"
+	mwCfg := mw.CreateConfig()
+	mwCfg.DBPath = "./GeoLite2-City.mmdb"
+	mwCfg.IPHeader = ipHeader
+
+	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
+	mw.ResetLookup()
+	instance, _ := mw.New(context.TODO(), next, mwCfg, "traefik-geoip2")
+
+	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+	req.Header.Set(ipHeader, ValidIPFromHeader)
+	instance.ServeHTTP(httptest.NewRecorder(), req)
+	assertHeader(t, req, mw.CountryHeader, "DE")
+	assertHeader(t, req, mw.RegionHeader, "BY")
+	assertHeader(t, req, mw.CityHeader, "Munich")
+	assertHeader(t, req, mw.LatitudeHeader, "48.1663")
+	assertHeader(t, req, mw.LongitudeHeader, "11.5683")
+
+	req = httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+	req.Header.Set(ipHeader, "qwerty")
+	instance.ServeHTTP(httptest.NewRecorder(), req)
+	assertHeader(t, req, mw.CountryHeader, mw.Unknown)
+	assertHeader(t, req, mw.RegionHeader, mw.Unknown)
+	assertHeader(t, req, mw.CityHeader, mw.Unknown)
+	assertHeader(t, req, mw.LatitudeHeader, mw.Unknown)
+	assertHeader(t, req, mw.LongitudeHeader, mw.Unknown)
 }
 
 func TestGeoIPCountryDBFromRemoteAddr(t *testing.T) {
