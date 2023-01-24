@@ -97,8 +97,7 @@ func (mw *TraefikGeoIP2) ServeHTTP(reqWr http.ResponseWriter, req *http.Request)
 		req.Header.Set(CountryHeader, Unknown)
 		req.Header.Set(RegionHeader, Unknown)
 		req.Header.Set(CityHeader, Unknown)
-		req.Header.Set(LatitudeHeader, Unknown)
-		req.Header.Set(LongitudeHeader, Unknown)
+		req.Header.Set(CoordinatesHeader, Unknown)
 		mw.next.ServeHTTP(reqWr, req)
 		return
 	}
@@ -113,19 +112,17 @@ func (mw *TraefikGeoIP2) ServeHTTP(reqWr http.ResponseWriter, req *http.Request)
 	if err != nil {
 		log.Printf("[geoip2] Unable to find: ip=%s, err=%v", ipStr, err)
 		res = &GeoIPResult{
-			country:   Unknown,
-			region:    Unknown,
-			city:      Unknown,
-			latitude:  Unknown,
-			longitude: Unknown,
+			country:     Unknown,
+			region:      Unknown,
+			city:        Unknown,
+			coordinates: Unknown,
 		}
 	}
 
 	req.Header.Set(CountryHeader, res.country)
 	req.Header.Set(RegionHeader, res.region)
 	req.Header.Set(CityHeader, res.city)
-	req.Header.Set(LatitudeHeader, res.latitude)
-	req.Header.Set(LongitudeHeader, res.longitude)
+	req.Header.Set(CoordinatesHeader, res.coordinates)
 
 	mw.next.ServeHTTP(reqWr, req)
 }

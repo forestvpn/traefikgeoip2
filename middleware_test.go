@@ -135,8 +135,7 @@ func TestGeoIPFromIPHeader(t *testing.T) {
 	assertHeader(t, req, mw.CountryHeader, "DE")
 	assertHeader(t, req, mw.RegionHeader, "BY")
 	assertHeader(t, req, mw.CityHeader, "Munich")
-	assertHeader(t, req, mw.LatitudeHeader, "48.1663")
-	assertHeader(t, req, mw.LongitudeHeader, "11.5683")
+	assertHeader(t, req, mw.CoordinatesHeader, "48.1663, 11.5683")
 
 	req = httptest.NewRequest(http.MethodGet, "http://localhost", nil)
 	req.Header.Set(ipHeader, "qwerty")
@@ -144,8 +143,7 @@ func TestGeoIPFromIPHeader(t *testing.T) {
 	assertHeader(t, req, mw.CountryHeader, mw.Unknown)
 	assertHeader(t, req, mw.RegionHeader, mw.Unknown)
 	assertHeader(t, req, mw.CityHeader, mw.Unknown)
-	assertHeader(t, req, mw.LatitudeHeader, mw.Unknown)
-	assertHeader(t, req, mw.LongitudeHeader, mw.Unknown)
+	assertHeader(t, req, mw.CoordinatesHeader, mw.Unknown)
 }
 
 func TestGeoIPCountryDBFromRemoteAddr(t *testing.T) {
